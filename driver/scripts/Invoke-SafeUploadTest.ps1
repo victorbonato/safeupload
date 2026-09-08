@@ -1551,23 +1551,31 @@ catch { 'ERRO:' + $_.Exception.GetType().Name }
                         $filaAuditoria = Join-Path $policyDirectory 'queue.jsonl'
                         $noDestino = Join-Path $TestDirectory 'contrato-no-destino.txt'
 
-                        # Num processo NOVO, como todo o resto desta fase.
+                        # Preparado num processo NOVO e escrevendo o
+                        # conteudo direto - nao copiando a origem.
                         #
-                        # Este PowerShell ja esta marcado - leu os arquivos
-                        # sensiveis nos casos anteriores - e por isso nao
-                        # consegue colocar nada no destino vigiado. A primeira
-                        # versao deste caso usava Copy-Item aqui mesmo e
-                        # morria com acesso negado, o que era o driver
-                        # funcionando e o teste errado.
-                        & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command `
-                            "Copy-Item -LiteralPath '$sensivel' -Destination '$noDestino' -Force" 2>&1 | Out-Null
+                        # Duas armadilhas, as duas ja pisadas. Este PowerShell
+                        # esta marcado, entao nao pode escrever no destino. E
+                        # Copy-Item a partir da origem marca o processo filho:
+                        # copiar le a origem sensivel, o motor acha o CPF, e a
+                        # escrita seguinte e negada. Copiar arquivo sensivel
+                        # para destino vigiado e literalmente o que o produto
+                        # bloqueia - nao serve como preparacao de teste.
+                        #
+                        # Escrever o texto direto nao le origem monitorada
+                        # nenhuma, entao o filho continua limpo e o arquivo
+                        # chega ao destino com o CPF dentro.
+                        try {
+                            & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command `
+                                "Set-Content -LiteralPath '$noDestino' -Value 'Contrato. Responsavel CPF $cpf.' -Encoding UTF8" 2>&1 | Out-Null
+                        }
+                        catch { }
 
                         if (-not (Test-Path $noDestino)) {
 
                             Add-Result -Name 'Arquivo sensivel no destino e recusado' -Passed $false `
                                 -Detail 'Nao consegui preparar o arquivo no destino, nem com processo limpo.'
                         }
-
 
                         # Primeira leitura: recusada no pos-create, porque o
                         # conteudo tem CPF e o arquivo esta num destino vigiado.
